@@ -1,90 +1,116 @@
 <!DOCTYPE html>
 <html>
-<body style="margin: 0; overflow: hidden; background: #000; font-family: monospace;">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; touch-action: none; }
+        canvas { display: block; }
+        .ui { position: absolute; bottom: 20px; left: 20px; display: flex; gap: 20px; width: 100%; }
+        .btn { width: 70px; height: 70px; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 10px; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; -webkit-user-select: none; }
+        .jump-btn { position: absolute; right: 40px; bottom: 20px; width: 80px; height: 80px; background: rgba(255,0,0,0.3); }
+        #menu { position: absolute; inset: 0; background: #000; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
+        #playBtn { padding: 15px 40px; background: #f00; border: none; color: #fff; font-size: 24px; cursor: pointer; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1 style="letter-spacing: 5px;">STORIES FROM THE VOID</h1>
+        <p>By Hafa Studio</p>
+        <button id="playBtn">PLAY</button>
+    </div>
+
+    <div class="ui" id="controls" style="display:none">
+        <div class="btn" id="leftBtn">←</div>
+        <div class="btn" id="rightBtn">→</div>
+        <div class="btn jump-btn" id="jumpBtn">UP</div>
+    </div>
+
     <canvas id="game"></canvas>
+
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+        const raw = "https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/";
 
-        const imgUrls = {
-            idle1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/idle1.png',
-            idlem1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/idlem1.png',
-            rm1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/rightm1.png',
-            rm2: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/rightm2.png',
-            lm1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/leftm1.png',
-            lm2: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/leftm2.png',
-            grass: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/grass1.jpg',
-            grib: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/grib.png'
+        const imgs = {
+            ip1: raw+"rightp1.png", ip2: raw+"rightp2.png", // игрок вправо
+            il1: raw+"leftp1.png", il2: raw+"leftp2.png",   // игрок влево (использовал твои названия)
+            id1: raw+"idle1.png", id2: raw+"idle2.png",      // игрок стоит/моргает
+            m1: raw+"idlem1.png", mr1: raw+"rightm1.png", mr2: raw+"rightm2.png", // монстр вправо
+            ml1: raw+"leftm1.png", ml2: raw+"leftm2.png", // монстр влево
+            g1: raw+"grass1.jpg", g2: raw+"grass2.jpg", grib: raw+"grib.png"
         };
 
         const s = {};
-        Object.keys(imgUrls).forEach(k => { s[k] = new Image(); s[k].src = imgUrls[k]; });
+        Object.keys(imgs).forEach(k => { s[k] = new Image(); s[k].src = imgs[k]; });
 
-        let gameState = 'menu', camX = 0, score = 0;
-        const p = { x: 400, y: 0, w: 60, h: 110, dx: 0, dy: 0, g: true, dir: 'r' };
+        let gameState = 'menu', camX = 0;
+        const p = { x: 300, y: 0, w: 80, h: 140, dx: 0, dy: 0, g: true, dir: 'r', walk: false };
         const gribs = [], enemies = [];
 
         function spawnGrib(x) {
-            let size = 50 + Math.random() * 150;
-            gribs.push({ x, y: canvas.height - size - 50, size });
+            let size = 100 + Math.random() * 200;
+            gribs.push({ x, y: canvas.height - size - 100, size });
         }
-        for(let i=0; i<20; i++) spawnGrib(i * 300);
+        for(let i=0; i<15; i++) spawnGrib(i * 400);
 
-        function drawMenu() {
-            ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width,canvas.height);
-            ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-            ctx.font = '40px monospace'; ctx.fillText('STORIES FROM THE VOID', canvas.width/2, canvas.height/2 - 50);
-            ctx.font = '15px monospace'; ctx.fillText('By HAFA Studio', canvas.width/2, canvas.height/2 - 20);
-            ctx.fillStyle = '#f00'; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 + 20, 100, 40);
-            ctx.fillStyle = '#fff'; ctx.fillText('PLAY', canvas.width/2, canvas.height/2 + 45);
-        }
+        function update() {
+            if(gameState !== 'play') return;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
 
-        function game() {
-            if(gameState !== 'play') return drawMenu();
-            ctx.clearRect(0,0,canvas.width,canvas.height);
+            camX += (p.x - camX - canvas.width/2) * 0.05; // Камера ближе к герою
             
-            camX += (p.x - camX - canvas.width/2) * 0.1;
-            ctx.save(); ctx.translate(-camX, 0);
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.save();
+            ctx.translate(-camX, 0);
 
-            // Бесконечная трава и грибы
-            for(let i = Math.floor(camX/50)*50; i < camX + canvas.width + 50; i+=50) {
-                ctx.drawImage(s.grass, i, canvas.height-50, 50, 50);
+            // Бесконечный мир
+            for(let i = Math.floor(camX/100)*100 - 100; i < camX + canvas.width + 100; i+=100) {
+                ctx.drawImage(s.g1, i, canvas.height-100, 100, 50);
+                ctx.drawImage(s.g2, i, canvas.height-50, 100, 50);
             }
-            gribs.forEach(g => ctx.drawImage(s.grib, g.x, g.y, g.size, g.size));
-            if(gribs[gribs.length-1].x < camX + canvas.width) spawnGrib(gribs[gribs.length-1].x + 300 + Math.random()*200);
 
-            // Сущности (преследование)
-            if(Math.random() < 0.01) enemies.push({x: camX + canvas.width, y: canvas.height-100});
+            gribs.forEach(g => ctx.drawImage(s.grib, g.x, g.y, g.size, g.size));
+            if(gribs[gribs.length-1].x < camX + canvas.width + 500) spawnGrib(gribs[gribs.length-1].x + 400);
+
+            // Монстры
+            if(Math.random() < 0.005) enemies.push({x: p.x + 800, y: canvas.height-180, w: 100, h: 100});
             enemies.forEach(e => {
-                e.x += (p.x > e.x ? 2 : -2);
-                ctx.fillStyle = 'red'; ctx.fillRect(e.x, e.y, 30, 30); // Заглушка монстра
+                let edir = p.x > e.x ? 2 : -2;
+                e.x += edir;
+                let mImg = s.m1;
+                if(edir > 0) mImg = (Date.now()%400 > 200) ? s.mr1 : s.mr2;
+                else mImg = (Date.now()%400 > 200) ? s.ml1 : s.ml2;
+                ctx.drawImage(mImg, e.x, e.y, e.w, e.h);
             });
 
             // Анимация игрока
-            let cur = s.idle1;
-            if(p.dx > 0) cur = (Date.now()%400 > 200) ? s.rm1 : s.rm2;
-            else if(p.dx < 0) cur = (Date.now()%400 > 200) ? s.lm1 : s.lm2;
-            else if(Date.now()%3000 < 200) cur = s.idlem1;
+            let cur = s.id1;
+            if(p.dx > 0) cur = (Date.now()%400 > 200) ? s.ip1 : s.ip2;
+            else if(p.dx < 0) cur = (Date.now()%400 > 200) ? s.il1 : s.il2;
+            else if(Date.now()%3000 < 300) cur = s.id2; // моргание
+
             ctx.drawImage(cur, p.x, p.y, p.w, p.h);
 
             p.x += p.dx; p.y += p.dy;
-            if(p.y + p.h < canvas.height-50) { p.dy += 0.8; p.g = false; }
-            else { p.dy = 0; p.y = canvas.height-50-p.h; p.g = true; }
+            if(p.y + p.h < canvas.height-100) { p.dy += 0.8; p.g = false; }
+            else { p.dy = 0; p.y = canvas.height-100-p.h; p.g = true; }
 
             ctx.restore();
-            requestAnimationFrame(game);
+            requestAnimationFrame(update);
         }
 
-        window.onkeydown = e => {
-            if(e.key == 'd') p.dx = 6; if(e.key == 'a') p.dx = -6;
-            if(e.key == 'w' && p.g) p.dy = -16;
-        };
-        window.onkeyup = () => p.dx = 0;
-        canvas.onclick = (e) => { if(gameState == 'menu') { gameState = 'play'; game(); } };
+        const play = () => { gameState = 'play'; document.getElementById('menu').style.display='none'; document.getElementById('controls').style.display='flex'; update(); };
+        document.getElementById('playBtn').onclick = play;
 
-        drawMenu();
+        // Мобильное управление
+        const ctrl = (id, val, k) => {
+            const el = document.getElementById(id);
+            el.ontouchstart = (e) => { e.preventDefault(); if(k=='j') { if(p.g) p.dy=-18; } else p.dx=val; };
+            el.ontouchend = () => { if(k!='j') p.dx=0; };
+        };
+        ctrl('leftBtn', -7); ctrl('rightBtn', 7); ctrl('jumpBtn', 0, 'j');
     </script>
 </body>
 </html>
