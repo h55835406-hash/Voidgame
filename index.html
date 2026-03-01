@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<body style="margin: 0; overflow: hidden; background: #050505;">
+<body style="margin: 0; overflow: hidden; background: #000; font-family: monospace;">
     <canvas id="game"></canvas>
     <script>
         const canvas = document.getElementById('game');
@@ -8,83 +8,83 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
-        const images = {
+        const imgUrls = {
             idle1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/idle1.png',
             idlem1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/idlem1.png',
-            rightm1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/rightm1.png',
-            rightm2: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/rightm2.png',
-            leftm1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/leftm1.png',
-            leftm2: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/leftm2.png',
+            rm1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/rightm1.png',
+            rm2: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/rightm2.png',
+            lm1: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/leftm1.png',
+            lm2: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/leftm2.png',
             grass: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/grass1.jpg',
-            mushroom: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/grib.png'
+            grib: 'https://raw.githubusercontent.com/h55835406-hash/Voidgame/main/grib.png'
         };
 
-        const sprites = {};
-        Object.keys(images).forEach(key => {
-            sprites[key] = new Image();
-            sprites[key].src = images[key];
-        });
+        const s = {};
+        Object.keys(imgUrls).forEach(k => { s[k] = new Image(); s[k].src = imgUrls[k]; });
 
-        const player = {
-            x: 100, y: 100, w: 60, h: 120,
-            dx: 0, dy: 0, grounded: false
-        };
+        let gameState = 'menu', camX = 0, score = 0;
+        const p = { x: 400, y: 0, w: 60, h: 110, dx: 0, dy: 0, g: true, dir: 'r' };
+        const gribs = [], enemies = [];
 
-        let mushroomSway = 0;
+        function spawnGrib(x) {
+            let size = 50 + Math.random() * 150;
+            gribs.push({ x, y: canvas.height - size - 50, size });
+        }
+        for(let i=0; i<20; i++) spawnGrib(i * 300);
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            mushroomSway += 0.05;
+        function drawMenu() {
+            ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+            ctx.font = '40px monospace'; ctx.fillText('STORIES FROM THE VOID', canvas.width/2, canvas.height/2 - 50);
+            ctx.font = '15px monospace'; ctx.fillText('By HAFA Studio', canvas.width/2, canvas.height/2 - 20);
+            ctx.fillStyle = '#f00'; ctx.fillRect(canvas.width/2 - 50, canvas.height/2 + 20, 100, 40);
+            ctx.fillStyle = '#fff'; ctx.fillText('PLAY', canvas.width/2, canvas.height/2 + 45);
+        }
+
+        function game() {
+            if(gameState !== 'play') return drawMenu();
+            ctx.clearRect(0,0,canvas.width,canvas.height);
             
-            // Земля
-            for(let i=0; i<canvas.width; i+=50) {
-                ctx.drawImage(sprites.grass, i, canvas.height-50, 50, 50);
+            camX += (p.x - camX - canvas.width/2) * 0.1;
+            ctx.save(); ctx.translate(-camX, 0);
+
+            // Бесконечная трава и грибы
+            for(let i = Math.floor(camX/50)*50; i < camX + canvas.width + 50; i+=50) {
+                ctx.drawImage(s.grass, i, canvas.height-50, 50, 50);
             }
+            gribs.forEach(g => ctx.drawImage(s.grib, g.x, g.y, g.size, g.size));
+            if(gribs[gribs.length-1].x < camX + canvas.width) spawnGrib(gribs[gribs.length-1].x + 300 + Math.random()*200);
 
-            // Тень и покачивающийся гриб
-            const sway = Math.sin(mushroomSway) * 5;
-            ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.beginPath();
-            ctx.ellipse(375, canvas.height-40, 60, 15, 0, 0, Math.PI*2);
-            ctx.fill();
-            ctx.drawImage(sprites.mushroom, 300 + sway, canvas.height-180, 150, 150);
+            // Сущности (преследование)
+            if(Math.random() < 0.01) enemies.push({x: camX + canvas.width, y: canvas.height-100});
+            enemies.forEach(e => {
+                e.x += (p.x > e.x ? 2 : -2);
+                ctx.fillStyle = 'red'; ctx.fillRect(e.x, e.y, 30, 30); // Заглушка монстра
+            });
 
-            // Тень под игроком
-            ctx.beginPath();
-            ctx.ellipse(player.x + player.w/2, canvas.height-45, 25, 10, 0, 0, Math.PI*2);
-            ctx.fill();
+            // Анимация игрока
+            let cur = s.idle1;
+            if(p.dx > 0) cur = (Date.now()%400 > 200) ? s.rm1 : s.rm2;
+            else if(p.dx < 0) cur = (Date.now()%400 > 200) ? s.lm1 : s.lm2;
+            else if(Date.now()%3000 < 200) cur = s.idlem1;
+            ctx.drawImage(cur, p.x, p.y, p.w, p.h);
 
-            // Анимация героя
-            let current = sprites.idle1;
-            if (player.dx > 0) current = (Math.floor(Date.now()/200)%2) ? sprites.rightm1 : sprites.rightm2;
-            else if (player.dx < 0) current = (Math.floor(Date.now()/200)%2) ? sprites.leftm1 : sprites.leftm2;
-            else if (Math.floor(Date.now()/2000)%5 === 0) current = sprites.idlem1;
+            p.x += p.dx; p.y += p.dy;
+            if(p.y + p.h < canvas.height-50) { p.dy += 0.8; p.g = false; }
+            else { p.dy = 0; p.y = canvas.height-50-p.h; p.g = true; }
 
-            ctx.drawImage(current, player.x, player.y, player.w, player.h);
-            
-            player.x += player.dx;
-            player.y += player.dy;
-            if (player.y + player.h < canvas.height-50) {
-                player.dy += 0.6;
-                player.grounded = false;
-            } else {
-                player.dy = 0;
-                player.y = canvas.height-50-player.h;
-                player.grounded = true;
-            }
-
-            requestAnimationFrame(draw);
+            ctx.restore();
+            requestAnimationFrame(game);
         }
 
         window.onkeydown = e => {
-            if (e.key == 'd' || e.key == 'в') player.dx = 5;
-            if (e.key == 'a' || e.key == 'ф') player.dx = -5;
-            if ((e.key == 'w' || e.key == 'ц') && player.grounded) player.dy = -15;
+            if(e.key == 'd') p.dx = 6; if(e.key == 'a') p.dx = -6;
+            if(e.key == 'w' && p.g) p.dy = -16;
         };
-        window.onkeyup = () => player.dx = 0;
+        window.onkeyup = () => p.dx = 0;
+        canvas.onclick = (e) => { if(gameState == 'menu') { gameState = 'play'; game(); } };
 
-        draw();
+        drawMenu();
     </script>
 </body>
 </html>
- 
